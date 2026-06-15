@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agrolab</title>
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- AOS -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <style>
+        :root {
+            --verde-escuro: #2d4a3e;
+            --verde-medio: #4a7c59;
+            --bege: #f5f1e8;
+            --marrom: #8b5a2b;
+            --laranja: #c67b3a;
+            --branco: #ffffff;
+            --cinza-claro: #f9f6f0;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, var(--bege) 0%, #e8dcc8 100%);
+            min-height: 100vh;
+        }
+        .navbar {
+            background: linear-gradient(135deg, var(--verde-escuro) 0%, #1a3328 100%);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.4rem;
+            letter-spacing: 0.5px;
+        }
+        .navbar-brand i {
+            margin-right: 8px;
+            color: var(--laranja);
+        }
+        .card-estacao {
+            border: none;
+            border-radius: 20px;
+            background: var(--branco);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            overflow: hidden;
+        }
+        .card-estacao:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+        }
+        .card-estacao .card-body {
+            padding: 1.8rem;
+        }
+        .card-estacao .icone-estacao {
+            font-size: 2.5rem;
+            color: var(--verde-medio);
+            margin-bottom: 0.8rem;
+        }
+        .card-estacao .card-title {
+            font-weight: 600;
+            color: var(--verde-escuro);
+            margin-bottom: 0.3rem;
+        }
+        .card-estacao .dado-rapido {
+            font-size: 0.85rem;
+            color: var(--marrom);
+        }
+        .card-estacao .dado-rapido i {
+            margin-right: 4px;
+            color: var(--laranja);
+        }
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+        }
+        .footer-bar {
+            background: var(--verde-escuro);
+            color: var(--bege);
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.85rem;
+            margin-top: 3rem;
+        }
+        @media (max-width: 576px) {
+            .card-dado .valor { font-size: 1.4rem; }
+            .card-dado .icone { font-size: 1.4rem; }
+            .chart-container { height: 250px; }
+            .navbar-brand { font-size: 1.1rem; }
+        }
+    </style>
+</head>
+<body>
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+    <div class="container">
+        <a class="navbar-brand" href="#">
+            <i class="fa-solid fa-sun-plant-wilt" style="color: var(--laranja);"></i> Agrolab
+        </a>
+        <div class="ms-auto d-flex align-items-center">
+            <a id="btn-cadastro" href="/cadastro.html" class="btn btn-outline-light btn-sm me-2" style="display:none;">
+                <i class="fa-solid fa-user-plus"></i> Cadastrar
+            </a>
+            <a id="btn-usuarios" href="/usuarios.html" class="btn btn-outline-light btn-sm me-2" style="display:none;">
+                <i class="fa-solid fa-users"></i> Usuários
+            </a>
+            <span id="user-info" class="text-white me-3"></span>
+            <form action="/logout" method="post" style="display:inline;">
+                <button type="submit" class="btn btn-outline-light btn-sm">
+                    <i class="fa-solid fa-right-from-bracket"></i> Sair
+                </button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<!-- Conteúdo principal -->
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4" data-aos="fade-down">
+        <h2 class="fw-bold" style="color: var(--verde-escuro);">
+            <i class="fa-solid fa-map-pin me-2" style="color: var(--laranja);"></i>Estações
+        </h2>
+        <span class="badge bg-success-subtle text-success fs-6">
+            <i class="fa-solid fa-wifi"></i> Online
+        </span>
+    </div>
+
+    <!-- Grid de estações -->
+    <div id="estacoes-grid" class="row g-4">
+        <div class="col-12 text-center loading-spinner" id="loading">
+            <div class="spinner-border" style="color: var(--verde-medio);" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<div class="footer-bar">
+    <i class="fa-solid fa-leaf"></i> Desenvolvido com Spring Boot & Chart.js | Estação Meteorológica v2.0
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script>
+    AOS.init({ duration: 800, once: true });
+
+    const API_BASE = '/api';
+
+    // ----- Carregar informações do usuário logado -----
+    async function carregarUsuarioAtual() {
+        try {
+            const resp = await fetch('/api/usuario/atual');
+            const data = await resp.json();
+            document.getElementById('user-info').innerHTML = `<i class="fa-solid fa-user"></i> ${data.username}`;
+            if (data.role === 'ADMIN') {
+                document.getElementById('btn-cadastro').style.display = 'inline-block';
+                document.getElementById('btn-usuarios').style.display = 'inline-block';
+            }
+        } catch (e) {
+            console.error('Erro ao obter usuário', e);
+        }
+    }
+
+    // ----- Grid de estações (cards) -----
+    async function carregarEstacoes() {
+        const grid = document.getElementById('estacoes-grid');
+        grid.innerHTML = `
+            <div class="col-12 text-center loading-spinner">
+                <div class="spinner-border" style="color: var(--verde-medio);" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>`;
+
+        try {
+            const resp = await fetch(`${API_BASE}/estacoes`);
+            const estacoes = await resp.json();
+            grid.innerHTML = '';
+
+            if (estacoes.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-12 text-center py-5" data-aos="fade-up">
+                        <i class="fa-solid fa-cloud-sun-rain" style="font-size: 4rem; color: var(--verde-medio);"></i>
+                        <h4 class="mt-3" style="color: var(--verde-escuro);">Nenhuma estação cadastrada</h4>
+                        <p class="text-muted">Conecte um ESP32 para começar.</p>
+                    </div>`;
+                return;
+            }
+
+            for (const estacao of estacoes) {
+                let ultimo = null;
+                try {
+                    const dadosResp = await fetch(`${API_BASE}/dados?estacao=${estacao.nome}`);
+                    const dados = await dadosResp.json();
+                    ultimo = dados.length > 0 ? dados[dados.length - 1] : null;
+                } catch (e) { /* offline */ }
+
+                const col = document.createElement('div');
+                col.className = 'col-md-6 col-lg-4';
+                col.setAttribute('data-aos', 'fade-up');
+                col.innerHTML = `
+                    <div class="card card-estacao h-100" onclick="window.location.href='estacao.html?nome=${estacao.nome}'">
+                        <div class="card-body text-center">
+                            <div class="icone-estacao">
+                                <i class="fa-solid fa-sun-plant-wilt"></i>
+                            </div>
+                            <h5 class="card-title">${estacao.nome}</h5>
+                            <p class="text-muted small">${estacao.localizacao || 'Localização não definida'}</p>
+                            <hr>
+                            ${ultimo ? `
+                            <div class="row text-center small">
+                                <div class="col-6 dado-rapido"><i class="fa-solid fa-temperature-half"></i> ${ultimo.temperatura?.toFixed(1) ?? '--'}°C</div>
+                                <div class="col-6 dado-rapido"><i class="fa-solid fa-droplet"></i> ${ultimo.umidade?.toFixed(1) ?? '--'}%</div>
+                                <div class="col-6 dado-rapido mt-1"><i class="fa-solid fa-wind"></i> ${ultimo.velocidadeVento?.toFixed(1) ?? '--'} m/s</div>
+                                <div class="col-6 dado-rapido mt-1"><i class="fa-solid fa-cloud-rain"></i> ${ultimo.chuva?.toFixed(1) ?? '0.0'} mm</div>
+                            </div>
+                            <p class="card-text mt-3"><small class="text-muted"><i class="fa-regular fa-clock"></i> ${new Date(ultimo.timestamp).toLocaleString()}</small></p>
+                            ` : '<p class="text-muted mt-3"><i class="fa-solid fa-circle-exclamation"></i> Sem dados</p>'}
+                        </div>
+                    </div>`;
+                grid.appendChild(col);
+            }
+        } catch (err) {
+            console.error(err);
+            grid.innerHTML = '<div class="col-12 text-center py-5 text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Erro ao carregar estações</div>';
+        }
+    }
+
+    // ----- Inicialização -----
+    carregarUsuarioAtual();
+    carregarEstacoes();
+    setInterval(carregarEstacoes, 30000);
+</script>
+</body>
+</html>
