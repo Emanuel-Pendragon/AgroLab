@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalhes da Estação</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <!-- Leaflet CSS e JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        @media (max-width: 576px) {
+            .card-dado .valor { font-size: 1.4rem; }
+            .card-dado .icone { font-size: 1.4rem; }
+            .chart-container { height: 250px; }
+            .navbar-brand { font-size: 1.1rem; }
+        }
+        :root {
+            --verde-escuro: #2d4a3e;
+            --verde-medio: #4a7c59;
+            --bege: #f5f1e8;
+            --marrom: #8b5a2b;
+            --laranja: #c67b3a;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, var(--bege) 0%, #e8dcc8 100%);
+            min-height: 100vh;
+            background-attachment: fixed;
+        }
+        .navbar {
+            background: linear-gradient(135deg, var(--verde-escuro) 0%, #1a3328 100%);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+        .card-dado {
+            border: 2px solid transparent;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.55);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease, border-color 0.3s;
+            height: 100%;
+        }
+        .card-dado:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+        .card-dado .card-body {
+            padding: 1.4rem;
+            text-align: center;
+        }
+        .card-dado .icone {
+            font-size: 1.8rem;
+            color: var(--verde-medio);
+            margin-bottom: 0.4rem;
+        }
+        .card-dado .valor {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--verde-escuro);
+        }
+        .card-dado .unidade {
+            font-size: 0.9rem;
+            color: var(--marrom);
+            font-weight: 500;
+        }
+        .card-dado .rotulo {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--marrom);
+            margin-bottom: 0.3rem;
+        }
+        .alerta-temp { border-color: #e74c3c; background: rgba(231, 76, 60, 0.08); }
+        .alerta-chuva { border-color: #3498db; background: rgba(52, 152, 219, 0.08); }
+        .alerta-vento { border-color: #9b59b6; background: rgba(155, 89, 182, 0.08); }
+        .alerta-umidade-baixa { border-color: #f39c12; background: rgba(243, 156, 18, 0.08); }
+        .seta-vento {
+            display: inline-block;
+            transition: transform 0.5s ease;
+            font-size: 1.6rem;
+            color: var(--laranja);
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        .card-grafico {
+            border: none;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+        .card-grafico .card-header {
+            background: rgba(74, 124, 89, 0.8);
+            backdrop-filter: blur(10px);
+            color: white;
+            font-weight: 600;
+            padding: 0.8rem 1.2rem;
+            font-size: 0.95rem;
+            border-bottom: none;
+        }
+        .card-grafico .card-header i {
+            margin-right: 6px;
+        }
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+        }
+        .footer-bar {
+            background: var(--verde-escuro);
+            color: var(--bege);
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.85rem;
+            margin-top: 3rem;
+        }
+        .form-select {
+            border-radius: 30px;
+            border: 2px solid var(--verde-medio);
+            background: rgba(255,255,255,0.5);
+            backdrop-filter: blur(4px);
+        }
+        .wind-rose-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 300px;
+        }
+        .wind-rose-container svg {
+            width: 250px;
+            height: 250px;
+        }
+        .direcao-seta {
+            transition: transform 0.8s ease;
+        }
+        /* Garante que o mapa não ultrapasse os limites do card */
+        #mapa-estacao {
+            height: 300px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+    <div class="container">
+        <a class="navbar-brand" href="index.html">
+            <i class="fa-solid fa-sun-plant-wilt" style="color: var(--laranja);"></i> Agrolab
+        </a>
+        <div class="ms-auto d-flex align-items-center">
+            <a id="btn-cadastro" href="/cadastro.html" class="btn btn-outline-light btn-sm me-2" style="display:none;">
+                <i class="fa-solid fa-user-plus"></i> Cadastrar
+            </a>
+            <a id="btn-usuarios" href="/usuarios.html" class="btn btn-outline-light btn-sm me-2" style="display:none;">
+                <i class="fa-solid fa-users"></i> Usuários
+            </a>
+            <span id="user-info" class="text-white me-3"></span>
+            <form action="/logout" method="post" style="display:inline;">
+                <button type="submit" class="btn btn-outline-light btn-sm">
+                    <i class="fa-solid fa-right-from-bracket"></i> Sair
+                </button>
+            </form>
+        </div>
+        <span class="navbar-text text-white fw-bold ms-3" id="nome-estacao">IEMA</span>
+    </div>
+</nav>
+
+<div class="container py-4">
+    <div class="row mb-4" data-aos="fade-down">
+        <div class="col-auto">
+            <label class="form-label fw-semibold" style="color: var(--verde-escuro);">
+                <i class="fa-solid fa-calendar-days me-1"></i>Período:
+            </label>
+            <select id="periodoSelect" class="form-select">
+                <option value="all">Todos os dados</option>
+                <option value="15m">Últimos 15 min</option>
+                <option value="1h">Última hora</option>
+                <option value="6h">Últimas 6 horas</option>
+                <option value="24h" selected>Últimas 24 horas</option>
+                <option value="7d">Últimos 7 dias</option>
+                <option value="30d">Últimos 30 dias</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="cards-container" class="row g-3 mb-4"></div>
+    <div class="row g-4" id="graficos-container"></div>
+</div>
+
+<div class="footer-bar">
+    <i class="fa-solid fa-leaf"></i> Desenvolvido com Spring Boot & Chart.js | Estação Meteorológica v2.0
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script>
+    AOS.init({ duration: 800, once: true });
+</script>
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const nomeEstacao = urlParams.get('nome') || 'IEMA';
+    document.getElementById('nome-estacao').textContent = nomeEstacao;
+
+    const API_BASE = '/api';
+    let charts = {};
+    let periodoSelecionado = '24h';
+    let mapaEstacao = null; // guarda a instância do mapa Leaflet
+
+    function getSetor(graus) {
+        if (graus == null) return -1;
+        return Math.round(graus / 45) % 8;
+    }
+
+    function calcularRegressao(y) {
+        const n = y.length;
+        if (n < 2) return null;
+        let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+        for (let i = 0; i < n; i++) {
+            sx += i;
+            sy += y[i];
+            sxy += i * y[i];
+            sx2 += i * i;
+        }
+        const b = (n * sxy - sx * sy) / (n * sx2 - sx * sx);
+        const a = (sy - b * sx) / n;
+        return { a, b };
+    }
+
+    function calcularDatas(periodo) {
+        const agora = new Date();
+        let inicio;
+        switch (periodo) {
+            case '15m': inicio = new Date(agora.getTime() - 15 * 60 * 1000); break;
+            case '1h': inicio = new Date(agora.getTime() - 60 * 60 * 1000); break;
+            case '6h': inicio = new Date(agora.getTime() - 6 * 60 * 60 * 1000); break;
+            case '24h': inicio = new Date(agora.getTime() - 24 * 60 * 60 * 1000); break;
+            case '7d': inicio = new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+            case '30d': inicio = new Date(agora.getTime() - 30 * 24 * 60 * 60 * 1000); break;
+            default: inicio = new Date(agora.getTime() - 24 * 60 * 60 * 1000);
+        }
+        return {
+            inicio: inicio.toISOString().slice(0, 19),
+            fim: agora.toISOString().slice(0, 19)
+        };
+    }
+
+    function animarValor(elemento, valorFinal, duracao = 800) {
+        if (valorFinal == null) {
+            elemento.textContent = '--';
+            return;
+        }
+        const inicio = 0;
+        const incremento = valorFinal / (duracao / 16);
+        let atual = inicio;
+        const passo = () => {
+            atual += incremento;
+            if (atual >= valorFinal) {
+                elemento.textContent = valorFinal.toFixed(1);
+                return;
+            }
+            elemento.textContent = atual.toFixed(1);
+            requestAnimationFrame(passo);
+        };
+        passo();
+    }
+
+    function classeStatus(campo, valor) {
+        if (valor == null) return '';
+        switch (campo) {
+            case 'temperatura': return valor > 30 ? 'alerta-temp' : '';
+            case 'chuva': return valor > 5 ? 'alerta-chuva' : '';
+            case 'velocidadeVento': return valor > 8 ? 'alerta-vento' : '';
+            case 'umidade': return valor < 30 ? 'alerta-umidade-baixa' : '';
+            default: return '';
+        }
+    }
+
+    async function carregarUsuarioAtual() {
+        try {
+            const resp = await fetch(`${API_BASE}/usuario/atual`);
+            const data = await resp.json();
+            document.getElementById('user-info').innerHTML = `<i class="fa-solid fa-user"></i> ${data.username}`;
+            if (data.role === 'ADMIN') {
+                document.getElementById('btn-cadastro').style.display = 'inline-block';
+                document.getElementById('btn-usuarios').style.display = 'inline-block';
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function carregarDados() {
+        const cardsContainer = document.getElementById('cards-container');
+        cardsContainer.innerHTML = `<div class="col-12 text-center loading-spinner"><div class="spinner-border" style="color: var(--verde-medio);" role="status"></div></div>`;
+
+        try {
+            let url;
+            if (periodoSelecionado === 'all') {
+                url = `${API_BASE}/dados?estacao=${nomeEstacao}`;
+            } else {
+                const { inicio, fim } = calcularDatas(periodoSelecionado);
+                url = `${API_BASE}/dados?estacao=${nomeEstacao}&inicio=${inicio}&fim=${fim}`;
+            }
+            const resp = await fetch(url);
+            const dados = await resp.json();
+            if (dados.length === 0) {
+                cardsContainer.innerHTML = '<div class="col-12 text-center py-5 text-muted"><i class="fa-solid fa-cloud-sun-rain" style="font-size: 3rem;"></i><h5 class="mt-2">Sem dados no período</h5></div>';
+                return;
+            }
+            atualizarCards(dados[dados.length - 1]);
+            atualizarGraficos(dados);
+            // Carrega o mapa (se ainda não existir)
+            carregarMapaEstacao();
+        } catch (err) {
+            console.error(err);
+            cardsContainer.innerHTML = '<div class="col-12 text-center py-5 text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Erro ao carregar</div>';
+        }
+    }
+
+    function atualizarCards(ultimo) {
+        const container = document.getElementById('cards-container');
+        const dir = ultimo.direcaoVento;
+        const dirHtml = dir != null
+            ? `<span class="seta-vento" style="transform: rotate(${dir}deg);"><i class="fa-solid fa-arrow-up-long"></i></span> <span class="fw-bold">${dir.toFixed(0)}°</span>`
+            : '<span class="text-muted">--</span>';
+
+        const cards = [
+            { icone: 'fa-temperature-half', rotulo: 'Temperatura', valor: ultimo.temperatura, unidade: '°C', campo: 'temperatura' },
+            { icone: 'fa-droplet', rotulo: 'Umidade', valor: ultimo.umidade, unidade: '%', campo: 'umidade' },
+            { icone: 'fa-gauge-high', rotulo: 'Pressão', valor: ultimo.pressao, unidade: 'hPa', campo: 'pressao' },
+            { icone: 'fa-sun', rotulo: 'Irradiância', valor: ultimo.luminosidade, unidade: 'W/m²', campo: 'luminosidade' },
+            { icone: 'fa-cloud-rain', rotulo: 'Chuva', valor: ultimo.chuva, unidade: 'mm', campo: 'chuva' },
+            { icone: 'fa-wind', rotulo: 'Vento', valor: ultimo.velocidadeVento, unidade: 'm/s', campo: 'velocidadeVento' },
+            { icone: 'fa-compass', rotulo: 'Direção', valor: dir, unidade: '', campo: 'direcaoVento', especial: dirHtml },
+            { icone: 'fa-earth-americas', rotulo: 'Solo', valor: ultimo.umidadeSolo, unidade: '%', campo: 'umidadeSolo' }
+        ];
+
+        container.innerHTML = cards.map((c, index) => {
+            const classeExtra = classeStatus(c.campo, c.valor);
+            const idValor = `valor-${index}`;
+            if (c.especial) {
+                return `<div class="col-6 col-md-3" data-aos="zoom-in"><div class="card card-dado ${classeExtra}"><div class="card-body"><div class="icone"><i class="fa-solid ${c.icone}"></i></div><div class="rotulo">${c.rotulo}</div><div class="valor">${c.especial}</div><div class="unidade">${c.unidade}</div></div></div></div>`;
+            }
+            return `<div class="col-6 col-md-3" data-aos="zoom-in"><div class="card card-dado ${classeExtra}"><div class="card-body"><div class="icone"><i class="fa-solid ${c.icone}"></i></div><div class="rotulo">${c.rotulo}</div><div class="valor" id="${idValor}">0.0</div><div class="unidade">${c.unidade}</div></div></div></div>`;
+        }).join('');
+
+        requestAnimationFrame(() => {
+            cards.forEach((c, index) => {
+                if (c.especial) return;
+                const elemento = document.getElementById(`valor-${index}`);
+                if (elemento && c.valor != null) {
+                    animarValor(elemento, c.valor);
+                } else if (elemento && c.valor == null) {
+                    elemento.textContent = '--';
+                }
+            });
+        });
+    }
+
+    function atualizarGraficos(dados) {
+        const labels = dados.map(d => d.timestamp);
+        const container = document.getElementById('graficos-container');
+
+        // Cria os containers dos gráficos e do mapa uma única vez
+        if (container.children.length === 0) {
+            const graficos = [
+                { id: 'chartTemp', titulo: 'Temperatura (°C)', icone: 'fa-temperature-half' },
+                { id: 'chartUmid', titulo: 'Umidade (%)', icone: 'fa-droplet' },
+                { id: 'chartPres', titulo: 'Pressão (hPa)', icone: 'fa-gauge-high' },
+                { id: 'chartSolar', titulo: 'Irradiância (W/m²)', icone: 'fa-sun' },
+                { id: 'chartVentoVel', titulo: 'Velocidade do Vento (m/s)', icone: 'fa-wind' },
+                { id: 'chartVentoDir', titulo: 'Rosa dos Ventos', icone: 'fa-compass' },
+                { id: 'chartChuva', titulo: 'Chuva (mm)', icone: 'fa-cloud-rain' },
+                { id: 'mapaEstacao', titulo: 'Localização', icone: 'fa-map-marker-alt', tipo: 'mapa' }
+            ];
+            container.innerHTML = graficos.map(g => {
+                if (g.tipo === 'mapa') {
+                    return `
+                        <div class="col-lg-6" data-aos="fade-up">
+                            <div class="card card-grafico h-100">
+                                <div class="card-header"><i class="fa-solid ${g.icone}"></i> ${g.titulo}</div>
+                                <div class="card-body p-2">
+                                    <div id="mapa-estacao" style="height: 300px;"></div>
+                                </div>
+                            </div>
+                        </div>`;
+                }
+                return `
+                    <div class="col-lg-6" data-aos="fade-up">
+                        <div class="card card-grafico h-100">
+                            <div class="card-header"><i class="fa-solid ${g.icone}"></i> ${g.titulo}</div>
+                            <div class="card-body p-2">
+                                <div class="chart-container" id="${g.id === 'chartVentoDir' ? 'windRoseContainer' : ''}">
+                                    ${g.id === 'chartVentoDir' ? '' : `<canvas id="${g.id}"></canvas>`}
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function plotarLinha(canvasId, campo, titulo, corBase, comTendencia = false) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const valores = dados.map(d => d[campo]);
+            const ctx = canvas.getContext('2d');
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, corBase + '80');
+            gradient.addColorStop(1, corBase + '10');
+
+            let datasets = [{
+                label: titulo,
+                data: valores,
+                borderColor: corBase,
+                backgroundColor: gradient,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 2,
+                pointHoverRadius: 5,
+                borderWidth: 2,
+            }];
+
+            if (comTendencia) {
+                const reg = calcularRegressao(valores);
+                if (reg) {
+                    const tendencia = valores.map((_, i) => reg.a + reg.b * i);
+                    datasets.push({
+                        label: 'Tendência',
+                        data: tendencia,
+                        borderColor: corBase,
+                        borderDash: [5, 5],
+                        borderWidth: 2,
+                        fill: false,
+                        pointRadius: 0
+                    });
+                }
+            }
+
+            if (charts[canvasId]) {
+                charts[canvasId].data.labels = labels;
+                charts[canvasId].data.datasets = datasets;
+                charts[canvasId].update();
+            } else {
+                charts[canvasId] = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'top', labels: { usePointStyle: true } },
+                            tooltip: { backgroundColor: 'rgba(0,0,0,0.7)', titleFont: { family: 'Poppins' }, bodyFont: { family: 'Poppins' } }
+                        },
+                        scales: {
+                            x: { grid: { color: '#e0e0e0' }, ticks: { font: { family: 'Poppins' } } },
+                            y: { beginAtZero: false, grid: { color: '#e0e0e0' }, ticks: { font: { family: 'Poppins' } } }
+                        }
+                    }
+                });
+            }
+        }
+
+        plotarLinha('chartTemp', 'temperatura', 'Temperatura', '#e74c3c', true);
+        plotarLinha('chartUmid', 'umidade', 'Umidade', '#3498db', true);
+        plotarLinha('chartPres', 'pressao', 'Pressão', '#2ecc71');
+        plotarLinha('chartSolar', 'luminosidade', 'Irradiância', '#f39c12');
+        plotarLinha('chartVentoVel', 'velocidadeVento', 'Vento', '#9b59b6');
+        plotarLinha('chartChuva', 'chuva', 'Chuva', '#1abc9c');
+
+        // Rosa dos Ventos em SVG
+        desenharRosaDosVentos(dados);
+    }
+
+    function desenharRosaDosVentos(dados) {
+        const container = document.getElementById('windRoseContainer');
+        if (!container) return;
+        container.innerHTML = ''; // limpa
+
+        const setoresNomes = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+        const contagem = new Array(8).fill(0);
+        dados.forEach(d => {
+            if (d.direcaoVento != null) {
+                let idx = getSetor(d.direcaoVento);
+                if (idx >= 0 && idx < 8) contagem[idx]++;
+            }
+        });
+
+        const maxContagem = Math.max(...contagem, 1);
+        const angulos = [0, 45, 90, 135, 180, 225, 270, 315];
+        const cores = [
+            '#a4b89c', '#c1a88d', '#d9b68c', '#9cb89c',
+            '#b89c7a', '#b8a89c', '#c1b89c', '#a49c8c'
+        ];
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('viewBox', '-100 -100 200 200');
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', '100%');
+        svg.style.maxWidth = '300px';
+        svg.style.margin = '0 auto';
+        container.appendChild(svg);
+
+        for (let i = 1; i <= 4; i++) {
+            const circle = document.createElementNS(svgNS, 'circle');
+            circle.setAttribute('cx', 0); circle.setAttribute('cy', 0);
+            circle.setAttribute('r', i * 20);
+            circle.setAttribute('fill', 'none');
+            circle.setAttribute('stroke', '#b0a090');
+            circle.setAttribute('stroke-width', 0.3);
+            circle.setAttribute('opacity', '0.5');
+            svg.appendChild(circle);
+        }
+
+        angulos.forEach(ang => {
+            const rad = ang * Math.PI / 180;
+            const x = 80 * Math.sin(rad);
+            const y = -80 * Math.cos(rad);
+            const line = document.createElementNS(svgNS, 'line');
+            line.setAttribute('x1', 0); line.setAttribute('y1', 0);
+            line.setAttribute('x2', x); line.setAttribute('y2', y);
+            line.setAttribute('stroke', '#c0b0a0');
+            line.setAttribute('stroke-width', 0.3);
+            line.setAttribute('opacity', '0.6');
+            svg.appendChild(line);
+        });
+
+        angulos.forEach((ang, i) => {
+            if (contagem[i] === 0) return;
+            const raio = (contagem[i] / maxContagem) * 70;
+            const rad1 = (ang - 22.5) * Math.PI / 180;
+            const rad2 = (ang + 22.5) * Math.PI / 180;
+            const x1 = raio * Math.sin(rad1);
+            const y1 = -raio * Math.cos(rad1);
+            const x2 = raio * Math.sin(rad2);
+            const y2 = -raio * Math.cos(rad2);
+
+            const path = document.createElementNS(svgNS, 'path');
+            const d = `M 0 0 L ${x1} ${y1} A ${raio} ${raio} 0 0 1 ${x2} ${y2} Z`;
+            path.setAttribute('d', d);
+            path.setAttribute('fill', cores[i]);
+            path.setAttribute('opacity', '0.7');
+            path.setAttribute('stroke', cores[i]);
+            path.setAttribute('stroke-width', '0.5');
+            svg.appendChild(path);
+        });
+
+        setoresNomes.forEach((nome, i) => {
+            const rad = angulos[i] * Math.PI / 180;
+            const x = 90 * Math.sin(rad);
+            const y = -90 * Math.cos(rad);
+            const text = document.createElementNS(svgNS, 'text');
+            text.setAttribute('x', x); text.setAttribute('y', y);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('dominant-baseline', 'middle');
+            text.setAttribute('fill', '#2d4a3e');
+            text.setAttribute('font-size', '11');
+            text.setAttribute('font-family', 'Poppins');
+            text.setAttribute('font-weight', '600');
+            text.textContent = nome;
+            svg.appendChild(text);
+        });
+
+        const ultimoDado = dados[dados.length - 1];
+        if (ultimoDado && ultimoDado.direcaoVento != null) {
+            const dirAtual = ultimoDado.direcaoVento;
+            const radSeta = dirAtual * Math.PI / 180;
+            const xSeta = 60 * Math.sin(radSeta);
+            const ySeta = -60 * Math.cos(radSeta);
+
+            const seta = document.createElementNS(svgNS, 'line');
+            seta.setAttribute('x1', 0); seta.setAttribute('y1', 0);
+            seta.setAttribute('x2', xSeta); seta.setAttribute('y2', ySeta);
+            seta.setAttribute('stroke', '#e74c3c');
+            seta.setAttribute('stroke-width', '3');
+            seta.setAttribute('marker-end', 'url(#arrowhead)');
+            seta.classList.add('direcao-seta');
+            seta.style.transition = 'all 0.8s ease';
+            svg.appendChild(seta);
+        }
+
+        if (!svg.querySelector('defs')) {
+            const defs = document.createElementNS(svgNS, 'defs');
+            const marker = document.createElementNS(svgNS, 'marker');
+            marker.setAttribute('id', 'arrowhead');
+            marker.setAttribute('markerWidth', '10');
+            marker.setAttribute('markerHeight', '7');
+            marker.setAttribute('refX', '10');
+            marker.setAttribute('refY', '3.5');
+            marker.setAttribute('orient', 'auto');
+            const arrow = document.createElementNS(svgNS, 'polygon');
+            arrow.setAttribute('points', '0 0, 10 3.5, 0 7');
+            arrow.setAttribute('fill', '#e74c3c');
+            marker.appendChild(arrow);
+            defs.appendChild(marker);
+            svg.insertBefore(defs, svg.firstChild);
+        }
+    }
+
+    // Inicializa o mapa com a localização da estação
+    function carregarMapaEstacao() {
+        const container = document.getElementById('mapa-estacao');
+        if (!container) return;
+        // Se o mapa já foi criado, apenas redimensiona (caso necessário)
+        if (mapaEstacao) {
+            mapaEstacao.invalidateSize();
+            return;
+        }
+        // Busca as coordenadas da estação específica
+        fetch(`${API_BASE}/estacoes?nome=${encodeURIComponent(nomeEstacao)}`)
+            .then(resp => resp.json())
+            .then(estacoes => {
+                if (estacoes.length > 0) {
+                    const est = estacoes[0];
+                    if (est.latitude && est.longitude) {
+                        mapaEstacao = L.map('mapa-estacao').setView([est.latitude, est.longitude], 14);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; OpenStreetMap contributors'
+                        }).addTo(mapaEstacao);
+                        L.marker([est.latitude, est.longitude])
+                            .addTo(mapaEstacao)
+                            .bindPopup(`<b>${est.nome}</b><br>${est.localizacao || ''}`);
+                    } else {
+                        container.innerHTML = '<div class="text-muted text-center pt-5">Localização não definida</div>';
+                    }
+                } else {
+                    container.innerHTML = '<div class="text-muted text-center pt-5">Estação não encontrada</div>';
+                }
+            })
+            .catch(err => {
+                console.error('Erro ao carregar localização', err);
+                container.innerHTML = '<div class="text-muted text-center pt-5">Erro ao carregar mapa</div>';
+            });
+    }
+
+    document.getElementById('periodoSelect').addEventListener('change', function() {
+        periodoSelecionado = this.value;
+        carregarDados();
+    });
+
+    carregarUsuarioAtual();
+    carregarDados();
+    setInterval(carregarDados, 10000);
+</script>
+</body>
+</html>
